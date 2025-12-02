@@ -1,0 +1,34 @@
+# Wails .gitignore 
+# ==========================================
+# Wails + Go + Node/Vite .gitignore
+# ==========================================
+
+# --- Go build output ---
+bin/
+build/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+
+# --- Wails build output ---
+udpserver/frontend/dist/
+udpserver/frontend/node_modules/
+udpserver/frontend/wailsjs/
+
+# --- Logs ---
+*.log
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- IDE/editor files ---
+.vscode/
+.idea/
+
+# --- Environment files ---
+.env
+.env.*
