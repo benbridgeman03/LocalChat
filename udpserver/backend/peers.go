@@ -2,8 +2,11 @@ package backend
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,6 +27,7 @@ type Peer struct {
 
 type PeerService struct {
 	ctx        context.Context
+	id         string
 	myPort     string
 	peers      map[string]*Peer
 	peersMutex sync.Mutex
@@ -31,20 +35,30 @@ type PeerService struct {
 
 func NewPeerService(localPort string) *PeerService {
 	ps := &PeerService{
+		id:     generateID(),
 		myPort: localPort,
 		peers:  make(map[string]*Peer),
 	}
-	go ps.discoveryLoop()
+
 	go ps.StartChatListener()
 	return ps
 }
 
 func (p *PeerService) SetContext(ctx context.Context) {
 	p.ctx = ctx
+	go p.discoveryLoop()
+}
+
+func generateID() string {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		return "unknown"
+	}
+	return hex.EncodeToString(bytes)
 }
 
 func (p *PeerService) discoveryLoop() {
-	go broadcastPresence(p.myPort)
+	go broadcastPresence(p.id, p.myPort)
 	go listenForPeers(p)
 
 	ticker := time.NewTicker(2 * time.Second)
@@ -53,14 +67,7 @@ func (p *PeerService) discoveryLoop() {
 	}
 }
 
-func broadcastPresence(localPort string) {
-	broadcastAddr := fmt.Sprintf("255.255.255.255:%d", DiscoveryPort)
-	addr, err := net.ResolveUDPAddr("udp4", broadcastAddr)
-	if err != nil {
-		fmt.Println("Failed to resolve broadcast address:", err)
-		return
-	}
-
+func broadcastPresence(id string, localPort string) {
 	conn, err := net.ListenUDP("udp4", nil)
 	if err != nil {
 		fmt.Println("Failed to open UDP socket:", err)
@@ -68,13 +75,51 @@ func broadcastPresence(localPort string) {
 	}
 	defer conn.Close()
 
-	msg := fmt.Sprintf("%s:%s", BroadcastMsg, localPort)
+	msg := fmt.Sprintf("%s:%s:%s", BroadcastMsg, id, localPort)
 
 	for {
-		_, err := conn.WriteToUDP([]byte(msg), addr)
+		interfaces, err := net.Interfaces()
 		if err != nil {
-			fmt.Println("Broadcast send error:", err)
+			fmt.Println("Error listing interfaces:", err)
+			time.Sleep(1 * time.Second)
+			continue
 		}
+
+		for _, iface := range interfaces {
+			if (iface.Flags&net.FlagUp) == 0 || (iface.Flags&net.FlagLoopback) != 0 {
+				continue
+			}
+
+			addrs, err := iface.Addrs()
+			if err != nil {
+				continue
+			}
+
+			for _, addr := range addrs {
+				ipNet, ok := addr.(*net.IPNet)
+				if !ok || ipNet.IP.To4() == nil {
+					continue
+				}
+
+				ip := ipNet.IP.To4()
+				mask := ipNet.Mask
+				broadcastIP := net.IP(make([]byte, 4))
+				for i := 0; i < 4; i++ {
+					broadcastIP[i] = ip[i] | ^mask[i]
+				}
+
+				dstAddr := &net.UDPAddr{
+					IP:   broadcastIP,
+					Port: DiscoveryPort,
+				}
+
+				_, err := conn.WriteToUDP([]byte(msg), dstAddr)
+				if err != nil {
+					fmt.Printf("Broadcast error on %s: %v\n", iface.Name, err)
+				}
+			}
+		}
+
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -101,16 +146,21 @@ func listenForPeers(p *PeerService) {
 		}
 
 		msg := string(buf[:n])
-		if len(msg) == 0 || len(msg) < len(BroadcastMsg)+2 {
+		if len(msg) < len(BroadcastMsg) {
 			continue
 		}
 
 		if msg[:len(BroadcastMsg)] == BroadcastMsg {
-			peerPort := msg[len(BroadcastMsg)+1:]
-			if peerPort == p.myPort {
+			parts := strings.Split(msg, ":")
+			if len(parts) != 3 {
 				continue
 			}
+			peerID := parts[1]
+			peerPort := parts[2]
 
+			if peerID == p.id {
+				continue
+			}
 			peerAddr := fmt.Sprintf("%s:%s", sender.IP.String(), peerPort)
 
 			p.peersMutex.Lock()
