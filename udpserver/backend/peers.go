@@ -260,33 +260,24 @@ func (p *PeerService) StartFileListener() {
 
 			msg := buf[:n]
 
-			// --- FIX START ---
-			// 1. Check if this is a FileResponse (contains "type" field)
 			var typeCheck struct {
 				Type string `json:"type"`
 			}
-			// We try to unmarshal just enough to check the type.
 			if err := json.Unmarshal(msg, &typeCheck); err == nil && typeCheck.Type != "" {
-				// It is a Response
 				var resp FileResponse
 				if err := json.Unmarshal(msg, &resp); err == nil {
 					fmt.Printf("Received File Response: %s for %s\n", resp.Type, resp.Filename)
 
 					if p.ctx != nil {
-						// Emit a specific event for responses so frontend or logic can handle it
 						runtime.EventsEmit(p.ctx, "file:response", resp)
 					}
 
-					// If ACCEPTED, this is where you would trigger the TCP file transfer
 					if resp.Type == "ACCEPTED" {
 						// p.StartTCPFileSender(...)
 					}
 				}
-				continue // Skip processing as an offer
+				continue
 			}
-			// --- FIX END ---
-
-			// 2. Otherwise, treat it as a FileOffer
 			var offer FileOffer
 
 			err = json.Unmarshal(msg, &offer)
@@ -298,7 +289,6 @@ func (p *PeerService) StartFileListener() {
 				continue
 			}
 
-			// Sanity check to ensure it's a valid offer
 			if offer.Filename == "" {
 				continue
 			}
