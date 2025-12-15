@@ -2,7 +2,7 @@
 
 A lightweight, peer-to-peer (P2P) messaging and file transfer tool for local area networks. Built with Go and Wails.
 
-![Chat Interface](screenshots/Home.png)
+![Chat Interface](screenshots/home-view.png)
 
 ## Capabilities
 
@@ -57,3 +57,9 @@ To create a standalone executable (no external dependencies required):
 wails build
 
 The binary will be located in the build/bin directory.
+
+### Peer Discovery & Chat
+![Chat Interface](screenshots/chat-view.png)
+
+### File Transfer Request
+![File Request](screenshots/file-request.png)
