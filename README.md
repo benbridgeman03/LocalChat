@@ -58,6 +58,8 @@ wails build
 
 The binary will be located in the build/bin directory.
 
+## Screenshots
+
 ### Peer Discovery & Chat
 ![Chat Interface](screenshots/chat-view.png)
 
