@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+
+      - name: Build
+        working-directory: udpserver
+        run: wails build
+
+      - name: Rename binary
+        run: mv udpserver/build/bin/udpserver.exe udpserver/build/bin/LocalChat.exe
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: udpserver/build/bin/LocalChat.exe
+          generate_release_notes: true
