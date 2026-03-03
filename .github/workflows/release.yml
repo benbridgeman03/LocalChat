@@ -24,6 +24,10 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Run tests
+        working-directory: udpserver
+        run: go test ./backend/ -v
+
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
